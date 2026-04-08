@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/spf13/viper"
@@ -26,7 +27,9 @@ func Load() (*Config, error) {
 	viper.SetConfigName("config")
 	viper.SetConfigType("yaml")
 	viper.AddConfigPath("/etc/ldap-admin-tool")
-	viper.AddConfigPath("$HOME/.ldap-admin-tool")
+	if home, err := os.UserHomeDir(); err == nil {
+		viper.AddConfigPath(filepath.Join(home, ".ldap-admin-tool"))
+	}
 	viper.AddConfigPath(".")
 
 	// Defaults
