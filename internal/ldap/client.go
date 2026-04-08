@@ -17,7 +17,10 @@ type Client struct {
 }
 
 func NewClient(cfg *config.Config, adminPass string) (*Client, error) {
-	parsed, _ := url.Parse(cfg.LDAPServer)
+	parsed, err := url.Parse(cfg.LDAPServer)
+	if err != nil || parsed.Hostname() == "" {
+		return nil, fmt.Errorf("invalid LDAP server URL %q: must include scheme (e.g. ldaps://host:636)", cfg.LDAPServer)
+	}
 	serverName := parsed.Hostname()
 
 	conn, err := ldap.DialURL(cfg.LDAPServer, ldap.DialWithTLSConfig(&tls.Config{
