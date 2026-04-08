@@ -12,6 +12,7 @@ import (
 	"github.com/misc-lab/ldap-admin-tool/internal/mail"
 	"github.com/misc-lab/ldap-admin-tool/internal/password"
 	"github.com/misc-lab/ldap-admin-tool/internal/pdf"
+	"github.com/misc-lab/ldap-admin-tool/internal/types"
 )
 
 var (
@@ -91,7 +92,7 @@ func runUserCreate(cmd *cobra.Command, args []string) error {
 		}
 
 		// Create user
-		user := ldapclient.User{
+		user := types.User{
 			FirstName: firstName,
 			LastName:  lastName,
 			UID:       uid,
@@ -115,18 +116,12 @@ func runUserCreate(cmd *cobra.Command, args []string) error {
 				fmt.Printf("[+] Added '%s' to group '%s'\n", uid, g)
 			}
 		}
+		user.Groups = groupList
 
 		// Generate PDF
 		var pdfPath string
 		if !noPDF {
-			pdfPath, err = pdf.Generate(cfg, pdf.UserInfo{
-				FirstName: firstName,
-				LastName:  lastName,
-				UID:       uid,
-				Email:     email,
-				Password:  userPass,
-				Groups:    groupList,
-			})
+			pdfPath, err = pdf.Generate(cfg, user)
 			if err != nil {
 				return fmt.Errorf("failed to generate PDF: %w", err)
 			}

@@ -8,20 +8,12 @@ import (
 
 	"github.com/go-ldap/ldap/v3"
 	"github.com/misc-lab/ldap-admin-tool/internal/config"
+	"github.com/misc-lab/ldap-admin-tool/internal/types"
 )
 
 type Client struct {
 	conn *ldap.Conn
 	cfg  *config.Config
-}
-
-type User struct {
-	FirstName string
-	LastName  string
-	UID       string
-	Email     string
-	Password  string
-	GID       int
 }
 
 func NewClient(cfg *config.Config, adminPass string) (*Client, error) {
@@ -73,7 +65,7 @@ func (c *Client) GetNextUIDNumber() (int, error) {
 	return maxUID + 1, nil
 }
 
-func (c *Client) CreateUser(user User, uidNumber int) (string, error) {
+func (c *Client) CreateUser(user types.User, uidNumber int) (string, error) {
 	cn := fmt.Sprintf("%s %s", user.FirstName, user.LastName)
 	dn := fmt.Sprintf("cn=%s,%s", cn, c.cfg.PeopleOU)
 	homeDir := fmt.Sprintf("/home/%s", user.UID)
