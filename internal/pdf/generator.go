@@ -6,18 +6,10 @@ import (
 
 	"github.com/jung-kurt/gofpdf"
 	"github.com/halladj/ldap-admin-tool/internal/config"
+	"github.com/halladj/ldap-admin-tool/internal/types"
 )
 
-type UserInfo struct {
-	FirstName string
-	LastName  string
-	UID       string
-	Email     string
-	Password  string
-	Groups    []string
-}
-
-func Generate(cfg *config.Config, user UserInfo) (string, error) {
+func Generate(cfg *config.Config, user types.User) (string, error) {
 	pdf := gofpdf.New("P", "mm", "A4", "")
 	pdf.AddPage()
 
