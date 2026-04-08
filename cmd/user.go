@@ -63,114 +63,98 @@ func init() {
 }
 
 func runUserCreate(cmd *cobra.Command, args []string) error {
-	// Load config
-	cfg, err := config.Load()
-	if err != nil {
-		return err
-	}
+	return withLDAPClient(func(cfg *config.Config, client *ldapclient.Client) error {
+		// Use config default GID if not set via flag
+		if gid == 0 {
+			gid = cfg.DefaultGID
+		}
 
-	// Use config default GID if not set via flag
-	if gid == 0 {
-		gid = cfg.DefaultGID
-	}
+		// Generate uid if not provided: first letter of first name + last name
+		if uid == "" {
+			uid = strings.ToLower(string(firstName[0]) + lastName)
+		}
 
-	// Load admin password
-	adminPass, err := cfg.LoadAdminPassword()
-	if err != nil {
-		return err
-	}
+		// Generate password if not provided
+		userPass := pass
+		if userPass == "" {
+			var err error
+			userPass, err = password.Generate(12)
+			if err != nil {
+				return fmt.Errorf("failed to generate password: %w", err)
+			}
+		}
 
-	// Generate uid if not provided: first letter of first name + last name
-	if uid == "" {
-		uid = strings.ToLower(string(firstName[0]) + lastName)
-	}
-
-	// Generate password if not provided
-	userPass := pass
-	if userPass == "" {
-		userPass, err = password.Generate(12)
+		// Get next UID number
+		uidNumber, err := client.GetNextUIDNumber()
 		if err != nil {
-			return fmt.Errorf("failed to generate password: %w", err)
+			return err
 		}
-	}
 
-	// Connect to LDAP
-	client, err := ldapclient.NewClient(cfg, adminPass)
-	if err != nil {
-		return err
-	}
-	defer client.Close()
-
-	// Get next UID number
-	uidNumber, err := client.GetNextUIDNumber()
-	if err != nil {
-		return err
-	}
-
-	// Create user
-	user := ldapclient.User{
-		FirstName: firstName,
-		LastName:  lastName,
-		UID:       uid,
-		Email:     email,
-		Password:  userPass,
-		GID:       gid,
-	}
-
-	_, err = client.CreateUser(user, uidNumber)
-	if err != nil {
-		return err
-	}
-	fmt.Printf("[+] User '%s' created (uidNumber: %d)\n", uid, uidNumber)
-
-	// Add to groups
-	groupList := parseGroups(groups)
-	for _, g := range groupList {
-		if err := client.AddToGroup(uid, g); err != nil {
-			fmt.Fprintf(os.Stderr, "[!] %v\n", err)
-		} else {
-			fmt.Printf("[+] Added '%s' to group '%s'\n", uid, g)
-		}
-	}
-
-	// Generate PDF
-	var pdfPath string
-	if !noPDF {
-		pdfPath, err = pdf.Generate(cfg, pdf.UserInfo{
+		// Create user
+		user := ldapclient.User{
 			FirstName: firstName,
 			LastName:  lastName,
 			UID:       uid,
 			Email:     email,
 			Password:  userPass,
-			Groups:    groupList,
-		})
+			GID:       gid,
+		}
+
+		_, err = client.CreateUser(user, uidNumber)
 		if err != nil {
-			return fmt.Errorf("failed to generate PDF: %w", err)
+			return err
 		}
-		fmt.Printf("[+] PDF generated: %s\n", pdfPath)
-		defer os.Remove(pdfPath)
-	}
+		fmt.Printf("[+] User '%s' created (uidNumber: %d)\n", uid, uidNumber)
 
-	// Send email
-	if !noEmail && pdfPath != "" {
-		if err := mail.SendWelcome(cfg.SenderEmail, email, firstName, lastName, uid, pdfPath); err != nil {
-			return fmt.Errorf("failed to send email: %w", err)
+		// Add to groups
+		groupList := parseGroups(groups)
+		for _, g := range groupList {
+			if err := client.AddToGroup(uid, g); err != nil {
+				fmt.Fprintf(os.Stderr, "[!] %v\n", err)
+			} else {
+				fmt.Printf("[+] Added '%s' to group '%s'\n", uid, g)
+			}
 		}
-		fmt.Printf("[+] Welcome email sent to %s\n", email)
-	}
 
-	// Summary
-	fmt.Printf("\n%s\n", strings.Repeat("=", 45))
-	fmt.Printf("  Account created successfully!\n")
-	fmt.Printf("  Username : %s\n", uid)
-	fmt.Printf("  Password : %s\n", userPass)
-	fmt.Printf("  Email    : %s\n", email)
-	if len(groupList) > 0 {
-		fmt.Printf("  Groups   : %s\n", strings.Join(groupList, ", "))
-	}
-	fmt.Printf("%s\n", strings.Repeat("=", 45))
+		// Generate PDF
+		var pdfPath string
+		if !noPDF {
+			pdfPath, err = pdf.Generate(cfg, pdf.UserInfo{
+				FirstName: firstName,
+				LastName:  lastName,
+				UID:       uid,
+				Email:     email,
+				Password:  userPass,
+				Groups:    groupList,
+			})
+			if err != nil {
+				return fmt.Errorf("failed to generate PDF: %w", err)
+			}
+			fmt.Printf("[+] PDF generated: %s\n", pdfPath)
+			defer os.Remove(pdfPath)
+		}
 
-	return nil
+		// Send email
+		if !noEmail && pdfPath != "" {
+			if err := mail.SendWelcome(cfg.SenderEmail, email, firstName, lastName, uid, pdfPath); err != nil {
+				return fmt.Errorf("failed to send email: %w", err)
+			}
+			fmt.Printf("[+] Welcome email sent to %s\n", email)
+		}
+
+		// Summary
+		fmt.Printf("\n%s\n", strings.Repeat("=", 45))
+		fmt.Printf("  Account created successfully!\n")
+		fmt.Printf("  Username : %s\n", uid)
+		fmt.Printf("  Password : %s\n", userPass)
+		fmt.Printf("  Email    : %s\n", email)
+		if len(groupList) > 0 {
+			fmt.Printf("  Groups   : %s\n", strings.Join(groupList, ", "))
+		}
+		fmt.Printf("%s\n", strings.Repeat("=", 45))
+
+		return nil
+	})
 }
 
 func parseGroups(g string) []string {
