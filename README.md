@@ -64,6 +64,31 @@ Alternatively, set environment variables with the prefix `LDAP_ADMIN_TOOL_` (e.g
 
 ## Usage
 
+### Command Hierarchy
+
+```
+ldap-admin-tool
+├── user
+│   ├── create          Create new LDAP user account
+│   │   └── Flags: --first*, --last*, --email*
+│   │           --uid, --password, --groups, --gid
+│   │           --no-email, --no-pdf
+│   │
+│   └── modify          Modify existing user
+│       ├── password [PASSWORD]       Change/reset password
+│       ├── email <EMAIL>             Update email address
+│       ├── add-group <GROUP...>      Add to one or more groups
+│       └── remove-group <GROUP...>   Remove from one or more groups
+│
+└── groups
+    ├── create <NAME> [--gid GID]     Create new group
+    ├── remove <NAME>                 Delete group
+    ├── add-users <GROUP> <UID...>    Add users to group
+    └── remove-users <GROUP> <UID...> Remove users from group
+```
+
+*Required flags
+
 ### User Management
 
 #### Create a User
