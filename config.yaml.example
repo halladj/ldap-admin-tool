@@ -1,0 +1,15 @@
+# LDAP User Tool Configuration
+# Place this file at one of:
+#   /etc/ldap-user-tool/config.yaml
+#   ~/.ldap-user-tool/config.yaml
+#   ./config.yaml
+
+ldap_server: "ldaps://ldap01.misc-lab.org"
+base_dn: "dc=misc-lab,dc=org"
+people_ou: "ou=People,dc=misc-lab,dc=org"
+group_ou: "ou=group,dc=misc-lab,dc=org"
+admin_dn: "cn=admin,dc=misc-lab,dc=org"
+admin_pass_file: "/etc/ldap/admin_pass"
+sender_email: "no-replay@misc-lab.org"
+default_shell: "/bin/bash"
+default_gid: 10008
