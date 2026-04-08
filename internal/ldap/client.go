@@ -7,7 +7,7 @@ import (
 	"strconv"
 
 	"github.com/go-ldap/ldap/v3"
-	"github.com/misc-lab/ldap-user-tool/internal/config"
+	"github.com/halladj/ldap-admin-tool/internal/config"
 )
 
 type Client struct {
@@ -200,6 +200,61 @@ func (c *Client) ChangeEmail(uid, newEmail string) error {
 
 	if err := c.conn.Modify(modReq); err != nil {
 		return fmt.Errorf("failed to change email: %w", err)
+	}
+
+	return nil
+}
+
+func (c *Client) GetNextGIDNumber() (int, error) {
+	searchReq := ldap.NewSearchRequest(
+		c.cfg.GroupOU,
+		ldap.ScopeWholeSubtree, ldap.NeverDerefAliases, 0, 0, false,
+		"(objectClass=posixGroup)",
+		[]string{"gidNumber"},
+		nil,
+	)
+
+	result, err := c.conn.Search(searchReq)
+	if err != nil {
+		return 0, fmt.Errorf("failed to search groups: %w", err)
+	}
+
+	maxGID := 10000
+	for _, entry := range result.Entries {
+		gidStr := entry.GetAttributeValue("gidNumber")
+		if gidStr != "" {
+			gid, _ := strconv.Atoi(gidStr)
+			if gid > maxGID {
+				maxGID = gid
+			}
+		}
+	}
+
+	return maxGID + 1, nil
+}
+
+func (c *Client) CreateGroup(name string, gid int) error {
+	groupDN := fmt.Sprintf("cn=%s,%s", name, c.cfg.GroupOU)
+
+	addReq := ldap.NewAddRequest(groupDN, nil)
+	addReq.Attribute("objectClass", []string{"posixGroup"})
+	addReq.Attribute("cn", []string{name})
+	addReq.Attribute("gidNumber", []string{strconv.Itoa(gid)})
+
+	if err := c.conn.Add(addReq); err != nil {
+		return fmt.Errorf("failed to create group '%s': %w", name, err)
+	}
+
+	return nil
+}
+
+func (c *Client) RemoveGroup(name string) error {
+	groupDN := fmt.Sprintf("cn=%s,%s", name, c.cfg.GroupOU)
+
+	delReq := ldap.NewDelRequest(groupDN, nil)
+
+	if err := c.conn.Del(delReq); err != nil {
+		return fmt.Errorf("failed to remove group '%s': %w", name, err)
 	}
 
 	return nil

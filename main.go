@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/misc-lab/ldap-user-tool/cmd"
+	"github.com/halladj/ldap-admin-tool/cmd"
 )
 
 func main() {

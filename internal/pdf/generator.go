@@ -5,7 +5,7 @@ import (
 	"os"
 
 	"github.com/jung-kurt/gofpdf"
-	"github.com/misc-lab/ldap-user-tool/internal/config"
+	"github.com/halladj/ldap-admin-tool/internal/config"
 )
 
 type UserInfo struct {

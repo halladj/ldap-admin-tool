@@ -1,7 +1,7 @@
-# LDAP User Tool Configuration
+# LDAP Admin Tool Configuration
 # Place this file at one of:
-#   /etc/ldap-user-tool/config.yaml
-#   ~/.ldap-user-tool/config.yaml
+#   /etc/ldap-admin-tool/config.yaml
+#   ~/.ldap-admin-tool/config.yaml
 #   ./config.yaml
 
 ldap_server: "ldaps://ldap01.your-domain.org"
