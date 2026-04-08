@@ -39,7 +39,7 @@ func Load() (*Config, error) {
 	viper.SetDefault("group_ou", "ou=group,dc=misc-lab,dc=org")
 	viper.SetDefault("admin_dn", "cn=admin,dc=misc-lab,dc=org")
 	viper.SetDefault("admin_pass_file", "/etc/ldap/admin_pass")
-	viper.SetDefault("sender_email", "no-replay@misc-lab.org")
+	viper.SetDefault("sender_email", "noreply@misc-lab.org")
 	viper.SetDefault("default_shell", "/bin/bash")
 	viper.SetDefault("default_gid", 10008)
 	viper.SetDefault("min_uid_number", 10000)
