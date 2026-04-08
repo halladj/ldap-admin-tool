@@ -5,9 +5,10 @@ import (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "ldap-admin-tool",
-	Short: "LDAP administration tool for your-domain.org",
-	Long:  "Manage LDAP users and groups. Create accounts, modify user details, and manage group memberships.",
+	Use:          "ldap-admin-tool",
+	Short:        "LDAP administration tool for your-domain.org",
+	Long:         "Manage LDAP users and groups. Create accounts, modify user details, and manage group memberships.",
+	SilenceUsage: true, // don't print usage on LDAP/config errors
 }
 
 func init() {
