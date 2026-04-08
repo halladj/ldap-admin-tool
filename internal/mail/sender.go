@@ -6,13 +6,21 @@ import (
 	"fmt"
 	"mime/multipart"
 	"net/textproto"
-	"os"
 	"os/exec"
-	"path/filepath"
-
 )
 
-func SendWelcome(senderEmail, to, firstName, lastName, uid, pdfPath string) error {
+// WelcomeEmail contains the information needed to send a welcome email with credentials.
+type WelcomeEmail struct {
+	From      string
+	To        string
+	FirstName string
+	LastName  string
+	UID       string
+	PDF       []byte
+}
+
+// SendWelcome sends a welcome email with LDAP credentials and PDF attachment.
+func SendWelcome(e WelcomeEmail) error {
 	body := fmt.Sprintf(`Hello %s %s,
 
 Your LDAP account on misc-lab.org has been created.
@@ -27,64 +35,48 @@ Please change your password after your first login.
 misc-lab.org Admin Team
 
 This is an automatically generated email, please do not reply.
-`, firstName, lastName, uid)
-
-	pdfData, err := os.ReadFile(pdfPath)
-	if err != nil {
-		return fmt.Errorf("failed to read PDF: %w", err)
-	}
+`, e.FirstName, e.LastName, e.UID)
 
 	var msg bytes.Buffer
-	writer := multipart.NewWriter(&msg)
+	mw := multipart.NewWriter(&msg)
 
-	// Headers
-	boundary := writer.Boundary()
-	msg.Reset()
-	fmt.Fprintf(&msg, "From: %s\r\n", senderEmail)
-	fmt.Fprintf(&msg, "To: %s\r\n", to)
+	// Email headers
+	fmt.Fprintf(&msg, "From: %s\r\n", e.From)
+	fmt.Fprintf(&msg, "To: %s\r\n", e.To)
 	fmt.Fprintf(&msg, "Subject: Your misc-lab.org LDAP Account Credentials\r\n")
 	fmt.Fprintf(&msg, "MIME-Version: 1.0\r\n")
-	fmt.Fprintf(&msg, "Content-Type: multipart/mixed; boundary=\"%s\"\r\n", boundary)
-	fmt.Fprintf(&msg, "\r\n")
+	fmt.Fprintf(&msg, "Content-Type: multipart/mixed; boundary=%s\r\n\r\n", mw.Boundary())
 
-	// Text body
-	fmt.Fprintf(&msg, "--%s\r\n", boundary)
-	fmt.Fprintf(&msg, "Content-Type: text/plain; charset=utf-8\r\n")
-	fmt.Fprintf(&msg, "\r\n")
-	fmt.Fprintf(&msg, "%s\r\n", body)
+	// Text part
+	textHeader := make(textproto.MIMEHeader)
+	textHeader.Set("Content-Type", "text/plain; charset=utf-8")
+	part, err := mw.CreatePart(textHeader)
+	if err != nil {
+		return fmt.Errorf("failed to create text part: %w", err)
+	}
+	fmt.Fprintf(part, "%s\r\n", body)
 
 	// PDF attachment
-	fmt.Fprintf(&msg, "--%s\r\n", boundary)
-
-	attachHeader := make(textproto.MIMEHeader)
-	attachHeader.Set("Content-Type", "application/pdf")
-	attachHeader.Set("Content-Transfer-Encoding", "base64")
-	attachHeader.Set("Content-Disposition",
-		fmt.Sprintf("attachment; filename=\"%s\"", filepath.Base("ldap_credentials_"+uid+".pdf")))
-
-	for key, values := range attachHeader {
-		for _, v := range values {
-			fmt.Fprintf(&msg, "%s: %s\r\n", key, v)
-		}
+	pdfHeader := make(textproto.MIMEHeader)
+	pdfHeader.Set("Content-Type", `application/pdf; name="ldap_credentials.pdf"`)
+	pdfHeader.Set("Content-Transfer-Encoding", "base64")
+	pdfHeader.Set("Content-Disposition", `attachment; filename="ldap_credentials.pdf"`)
+	pdfPart, err := mw.CreatePart(pdfHeader)
+	if err != nil {
+		return fmt.Errorf("failed to create PDF part: %w", err)
 	}
-	fmt.Fprintf(&msg, "\r\n")
-
-	encoded := base64.StdEncoding.EncodeToString(pdfData)
-	for i := 0; i < len(encoded); i += 76 {
-		end := i + 76
-		if end > len(encoded) {
-			end = len(encoded)
-		}
-		fmt.Fprintf(&msg, "%s\r\n", encoded[i:end])
+	enc := base64.NewEncoder(base64.StdEncoding, pdfPart)
+	if _, err := enc.Write(e.PDF); err != nil {
+		return fmt.Errorf("failed to encode PDF: %w", err)
 	}
+	enc.Close()
 
-	fmt.Fprintf(&msg, "--%s--\r\n", boundary)
+	mw.Close()
 
 	cmd := exec.Command("/usr/sbin/sendmail", "-t", "-oi")
 	cmd.Stdin = &msg
 
-	output, err := cmd.CombinedOutput()
-	if err != nil {
+	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("sendmail failed: %w: %s", err, string(output))
 	}
 
