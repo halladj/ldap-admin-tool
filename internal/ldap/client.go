@@ -131,33 +131,3 @@ func (c *Client) AddToGroup(uid, groupName string) error {
 
 	return nil
 }
-
-func (c *Client) ChangePassword(uid, newPassword string) error {
-	searchReq := ldap.NewSearchRequest(
-		c.cfg.PeopleOU,
-		ldap.ScopeWholeSubtree, ldap.NeverDerefAliases, 0, 0, false,
-		fmt.Sprintf("(uid=%s)", ldap.EscapeFilter(uid)),
-		[]string{"dn"},
-		nil,
-	)
-
-	result, err := c.conn.Search(searchReq)
-	if err != nil {
-		return fmt.Errorf("failed to search for user '%s': %w", uid, err)
-	}
-
-	if len(result.Entries) == 0 {
-		return fmt.Errorf("user '%s' not found", uid)
-	}
-
-	userDN := result.Entries[0].DN
-
-	modReq := ldap.NewModifyRequest(userDN, nil)
-	modReq.Replace("userPassword", []string{newPassword})
-
-	if err := c.conn.Modify(modReq); err != nil {
-		return fmt.Errorf("failed to change password: %w", err)
-	}
-
-	return nil
-}
