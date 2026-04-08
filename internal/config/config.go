@@ -18,6 +18,8 @@ type Config struct {
 	SenderEmail   string `mapstructure:"sender_email"`
 	DefaultShell  string `mapstructure:"default_shell"`
 	DefaultGID    int    `mapstructure:"default_gid"`
+	MinUIDNumber  int    `mapstructure:"min_uid_number"`
+	MinGIDNumber  int    `mapstructure:"min_gid_number"`
 }
 
 func Load() (*Config, error) {
@@ -37,6 +39,8 @@ func Load() (*Config, error) {
 	viper.SetDefault("sender_email", "no-replay@misc-lab.org")
 	viper.SetDefault("default_shell", "/bin/bash")
 	viper.SetDefault("default_gid", 10008)
+	viper.SetDefault("min_uid_number", 10000)
+	viper.SetDefault("min_gid_number", 10000)
 
 	// Environment variables: LDAP_ADMIN_TOOL_LDAP_SERVER, etc.
 	viper.SetEnvPrefix("LDAP_ADMIN_TOOL")

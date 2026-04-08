@@ -40,29 +40,33 @@ func (c *Client) Close() {
 	c.conn.Close()
 }
 
-func (c *Client) GetNextUIDNumber() (int, error) {
+// nextIDNumber finds the highest existing ID number in a search result and returns next available ID.
+func (c *Client) nextIDNumber(searchBase, filter, attr string, floor int) (int, error) {
 	req := ldap.NewSearchRequest(
-		c.cfg.PeopleOU,
+		searchBase,
 		ldap.ScopeWholeSubtree, ldap.NeverDerefAliases, 0, 0, false,
-		"(objectClass=posixAccount)",
-		[]string{"uidNumber"},
+		filter,
+		[]string{attr},
 		nil,
 	)
 
 	result, err := c.conn.Search(req)
 	if err != nil {
-		return 0, fmt.Errorf("failed to search for uidNumbers: %w", err)
+		return 0, fmt.Errorf("failed to search %s: %w", searchBase, err)
 	}
 
-	maxUID := 10000
+	max := floor
 	for _, entry := range result.Entries {
-		uidStr := entry.GetAttributeValue("uidNumber")
-		if uid, err := strconv.Atoi(uidStr); err == nil && uid > maxUID {
-			maxUID = uid
+		if n, err := strconv.Atoi(entry.GetAttributeValue(attr)); err == nil && n > max {
+			max = n
 		}
 	}
 
-	return maxUID + 1, nil
+	return max + 1, nil
+}
+
+func (c *Client) GetNextUIDNumber() (int, error) {
+	return c.nextIDNumber(c.cfg.PeopleOU, "(objectClass=posixAccount)", "uidNumber", c.cfg.MinUIDNumber)
 }
 
 func (c *Client) CreateUser(user types.User, uidNumber int) (string, error) {
@@ -198,31 +202,7 @@ func (c *Client) ChangeEmail(uid, newEmail string) error {
 }
 
 func (c *Client) GetNextGIDNumber() (int, error) {
-	searchReq := ldap.NewSearchRequest(
-		c.cfg.GroupOU,
-		ldap.ScopeWholeSubtree, ldap.NeverDerefAliases, 0, 0, false,
-		"(objectClass=posixGroup)",
-		[]string{"gidNumber"},
-		nil,
-	)
-
-	result, err := c.conn.Search(searchReq)
-	if err != nil {
-		return 0, fmt.Errorf("failed to search groups: %w", err)
-	}
-
-	maxGID := 10000
-	for _, entry := range result.Entries {
-		gidStr := entry.GetAttributeValue("gidNumber")
-		if gidStr != "" {
-			gid, _ := strconv.Atoi(gidStr)
-			if gid > maxGID {
-				maxGID = gid
-			}
-		}
-	}
-
-	return maxGID + 1, nil
+	return c.nextIDNumber(c.cfg.GroupOU, "(objectClass=posixGroup)", "gidNumber", c.cfg.MinGIDNumber)
 }
 
 func (c *Client) CreateGroup(name string, gid int) error {
