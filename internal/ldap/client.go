@@ -141,8 +141,9 @@ func (c *Client) RemoveFromGroup(uid, groupName string) error {
 	return nil
 }
 
-func (c *Client) ChangePassword(uid, newPassword string) error {
-	searchReq := ldap.NewSearchRequest(
+// findUserDN searches for a user by uid and returns their DN
+func (c *Client) findUserDN(uid string) (string, error) {
+	req := ldap.NewSearchRequest(
 		c.cfg.PeopleOU,
 		ldap.ScopeWholeSubtree, ldap.NeverDerefAliases, 0, 0, false,
 		fmt.Sprintf("(uid=%s)", ldap.EscapeFilter(uid)),
@@ -150,18 +151,25 @@ func (c *Client) ChangePassword(uid, newPassword string) error {
 		nil,
 	)
 
-	result, err := c.conn.Search(searchReq)
+	result, err := c.conn.Search(req)
 	if err != nil {
-		return fmt.Errorf("failed to search for user '%s': %w", uid, err)
+		return "", fmt.Errorf("failed to search for user '%s': %w", uid, err)
 	}
 
 	if len(result.Entries) == 0 {
-		return fmt.Errorf("user '%s' not found", uid)
+		return "", fmt.Errorf("user '%s' not found", uid)
 	}
 
-	userDN := result.Entries[0].DN
+	return result.Entries[0].DN, nil
+}
 
-	modReq := ldap.NewModifyRequest(userDN, nil)
+func (c *Client) ChangePassword(uid, newPassword string) error {
+	dn, err := c.findUserDN(uid)
+	if err != nil {
+		return err
+	}
+
+	modReq := ldap.NewModifyRequest(dn, nil)
 	modReq.Replace("userPassword", []string{newPassword})
 
 	if err := c.conn.Modify(modReq); err != nil {
@@ -172,26 +180,12 @@ func (c *Client) ChangePassword(uid, newPassword string) error {
 }
 
 func (c *Client) ChangeEmail(uid, newEmail string) error {
-	searchReq := ldap.NewSearchRequest(
-		c.cfg.PeopleOU,
-		ldap.ScopeWholeSubtree, ldap.NeverDerefAliases, 0, 0, false,
-		fmt.Sprintf("(uid=%s)", ldap.EscapeFilter(uid)),
-		[]string{"dn"},
-		nil,
-	)
-
-	result, err := c.conn.Search(searchReq)
+	dn, err := c.findUserDN(uid)
 	if err != nil {
-		return fmt.Errorf("failed to search for user '%s': %w", uid, err)
+		return err
 	}
 
-	if len(result.Entries) == 0 {
-		return fmt.Errorf("user '%s' not found", uid)
-	}
-
-	userDN := result.Entries[0].DN
-
-	modReq := ldap.NewModifyRequest(userDN, nil)
+	modReq := ldap.NewModifyRequest(dn, nil)
 	modReq.Replace("mail", []string{newEmail})
 
 	if err := c.conn.Modify(modReq); err != nil {
