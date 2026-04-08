@@ -1,0 +1,15 @@
+# LDAP User Tool Configuration
+# Place this file at one of:
+#   /etc/ldap-user-tool/config.yaml
+#   ~/.ldap-user-tool/config.yaml
+#   ./config.yaml
+
+ldap_server: "ldaps://ldap01.your-domain.org"
+base_dn: "dc=your-domain,dc=org"
+people_ou: "ou=People,dc=your-domain,dc=org"
+group_ou: "ou=group,dc=your-domain,dc=org"
+admin_dn: "cn=admin,dc=your-domain,dc=org"
+admin_pass_file: "/etc/ldap/admin_pass"
+sender_email: "no-replay@your-domain.org"
+default_shell: "/bin/bash"
+default_gid: 10008

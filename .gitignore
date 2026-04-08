@@ -1,0 +1,34 @@
+# Binaries
+ldap-user-tool
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Build directories
+dist/
+bin/
+
+# Temporary files
+*.tmp
+tmp/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+*.iml
+*.sublime-project
+*.sublime-workspace
+
+# Environment files
+.env
+.env.local
+*.pem
+admin_pass
+
+# Generated files
+*.pdf
