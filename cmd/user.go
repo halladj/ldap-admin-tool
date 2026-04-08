@@ -119,19 +119,25 @@ func runUserCreate(cmd *cobra.Command, args []string) error {
 		user.Groups = groupList
 
 		// Generate PDF
-		var pdfPath string
+		var pdfBytes []byte
 		if !noPDF {
-			pdfPath, err = pdf.Generate(cfg, user)
+			pdfBytes, err = pdf.Generate(cfg, user)
 			if err != nil {
 				return fmt.Errorf("failed to generate PDF: %w", err)
 			}
-			fmt.Printf("[+] PDF generated: %s\n", pdfPath)
-			defer os.Remove(pdfPath)
+			fmt.Printf("[+] PDF generated (%d bytes)\n", len(pdfBytes))
 		}
 
 		// Send email
-		if !noEmail && pdfPath != "" {
-			if err := mail.SendWelcome(cfg.SenderEmail, email, firstName, lastName, uid, pdfPath); err != nil {
+		if !noEmail && len(pdfBytes) > 0 {
+			if err := mail.SendWelcome(mail.WelcomeEmail{
+				From:      cfg.SenderEmail,
+				To:        email,
+				FirstName: firstName,
+				LastName:  lastName,
+				UID:       uid,
+				PDF:       pdfBytes,
+			}); err != nil {
 				return fmt.Errorf("failed to send email: %w", err)
 			}
 			fmt.Printf("[+] Welcome email sent to %s\n", email)
