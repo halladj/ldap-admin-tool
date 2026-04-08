@@ -23,8 +23,8 @@ type Config struct {
 func Load() (*Config, error) {
 	viper.SetConfigName("config")
 	viper.SetConfigType("yaml")
-	viper.AddConfigPath("/etc/ldap-user-tool")
-	viper.AddConfigPath("$HOME/.ldap-user-tool")
+	viper.AddConfigPath("/etc/ldap-admin-tool")
+	viper.AddConfigPath("$HOME/.ldap-admin-tool")
 	viper.AddConfigPath(".")
 
 	// Defaults
@@ -38,8 +38,8 @@ func Load() (*Config, error) {
 	viper.SetDefault("default_shell", "/bin/bash")
 	viper.SetDefault("default_gid", 10008)
 
-	// Environment variables: LDAP_USER_TOOL_LDAP_SERVER, etc.
-	viper.SetEnvPrefix("LDAP_USER_TOOL")
+	// Environment variables: LDAP_ADMIN_TOOL_LDAP_SERVER, etc.
+	viper.SetEnvPrefix("LDAP_ADMIN_TOOL")
 	viper.AutomaticEnv()
 
 	// Read config file (optional — defaults work without one)

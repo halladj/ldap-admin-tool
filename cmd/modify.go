@@ -6,9 +6,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/misc-lab/ldap-user-tool/internal/config"
-	ldapclient "github.com/misc-lab/ldap-user-tool/internal/ldap"
-	"github.com/misc-lab/ldap-user-tool/internal/password"
+	"github.com/misc-lab/ldap-admin-tool/internal/config"
+	ldapclient "github.com/misc-lab/ldap-admin-tool/internal/ldap"
+	"github.com/misc-lab/ldap-admin-tool/internal/password"
 )
 
 var modifyUID string
@@ -24,8 +24,8 @@ var modifyPasswordCmd = &cobra.Command{
 	Short: "Change a user's password",
 	Long:  "Change a user's password. If no password is provided, a new one will be auto-generated.",
 	Args:  cobra.MaximumNArgs(1),
-	Example: `  ldap-user-tool modify password --uid ftotti "NewP@ss1!"
-  ldap-user-tool modify password --uid ftotti  # auto-generates`,
+	Example: `  ldap-admin-tool user modify password --uid ftotti "NewP@ss1!"
+  ldap-admin-tool user modify password --uid ftotti  # auto-generates`,
 	RunE: runModifyPassword,
 }
 
@@ -33,7 +33,7 @@ var modifyEmailCmd = &cobra.Command{
 	Use:   "email <email>",
 	Short: "Change a user's email",
 	Args:  cobra.ExactArgs(1),
-	Example: `  ldap-user-tool modify email --uid ftotti new@misc-lab.org`,
+	Example: `  ldap-admin-tool user modify email --uid ftotti new@misc-lab.org`,
 	RunE: runModifyEmail,
 }
 
@@ -41,8 +41,8 @@ var modifyAddGroupCmd = &cobra.Command{
 	Use:   "add-group <group> [group ...]",
 	Short: "Add a user to one or more groups",
 	Args:  cobra.MinimumNArgs(1),
-	Example: `  ldap-user-tool modify add-group --uid ftotti printing-b
-  ldap-user-tool modify add-group --uid ftotti printing-b admins-cups`,
+	Example: `  ldap-admin-tool user modify add-group --uid ftotti printing-b
+  ldap-admin-tool user modify add-group --uid ftotti printing-b admins-cups`,
 	RunE: runModifyAddGroup,
 }
 
@@ -50,8 +50,8 @@ var modifyRemoveGroupCmd = &cobra.Command{
 	Use:   "remove-group <group> [group ...]",
 	Short: "Remove a user from one or more groups",
 	Args:  cobra.MinimumNArgs(1),
-	Example: `  ldap-user-tool modify remove-group --uid ftotti printing-a
-  ldap-user-tool modify remove-group --uid ftotti printing-a printing-b`,
+	Example: `  ldap-admin-tool user modify remove-group --uid ftotti printing-a
+  ldap-admin-tool user modify remove-group --uid ftotti printing-a printing-b`,
 	RunE: runModifyRemoveGroup,
 }
 
@@ -63,8 +63,6 @@ func init() {
 	modifyCmd.AddCommand(modifyEmailCmd)
 	modifyCmd.AddCommand(modifyAddGroupCmd)
 	modifyCmd.AddCommand(modifyRemoveGroupCmd)
-
-	rootCmd.AddCommand(modifyCmd)
 }
 
 func runModifyPassword(cmd *cobra.Command, args []string) error {

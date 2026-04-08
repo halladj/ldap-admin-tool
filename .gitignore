@@ -1,4 +1,5 @@
 # Binaries
+ldap-admin-tool
 ldap-user-tool
 *.exe
 *.dll

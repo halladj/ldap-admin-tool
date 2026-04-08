@@ -1,4 +1,4 @@
-module github.com/misc-lab/ldap-user-tool
+module github.com/misc-lab/ldap-admin-tool
 
 go 1.24.0
 
