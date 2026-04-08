@@ -140,8 +140,13 @@ func runUserCreate(cmd *cobra.Command, args []string) error {
 		// Summary
 		rows := []string{
 			"Username", uid,
-			"Password", userPass,
 			"Email", email,
+		}
+		if noEmail {
+			rows = append(rows, "Password", userPass)
+			rows = append(rows, "Note", "save this — no email will be sent")
+		} else {
+			rows = append(rows, "Status", "credentials sent to "+email)
 		}
 		if len(groupList) > 0 {
 			rows = append(rows, "Groups", strings.Join(groupList, ", "))
