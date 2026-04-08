@@ -66,139 +66,84 @@ func init() {
 }
 
 func runModifyPassword(cmd *cobra.Command, args []string) error {
-	cfg, err := config.Load()
-	if err != nil {
-		return err
-	}
-
-	adminPass, err := cfg.LoadAdminPassword()
-	if err != nil {
-		return err
-	}
-
-	userPass := ""
-	if len(args) > 0 {
-		userPass = args[0]
-	} else {
-		userPass, err = password.Generate(12)
-		if err != nil {
-			return fmt.Errorf("failed to generate password: %w", err)
+	return withLDAPClient(func(cfg *config.Config, client *ldapclient.Client) error {
+		userPass := ""
+		if len(args) > 0 {
+			userPass = args[0]
+		} else {
+			var err error
+			userPass, err = password.Generate(12)
+			if err != nil {
+				return fmt.Errorf("failed to generate password: %w", err)
+			}
 		}
-	}
 
-	client, err := ldapclient.NewClient(cfg, adminPass)
-	if err != nil {
-		return err
-	}
-	defer client.Close()
+		if err := client.ChangePassword(modifyUID, userPass); err != nil {
+			return err
+		}
 
-	if err := client.ChangePassword(modifyUID, userPass); err != nil {
-		return err
-	}
+		fmt.Printf("\n%s\n", strings.Repeat("=", 45))
+		fmt.Printf("  Password changed successfully!\n")
+		fmt.Printf("  Username : %s\n", modifyUID)
+		fmt.Printf("  Password : %s\n", userPass)
+		fmt.Printf("%s\n", strings.Repeat("=", 45))
 
-	fmt.Printf("\n%s\n", strings.Repeat("=", 45))
-	fmt.Printf("  Password changed successfully!\n")
-	fmt.Printf("  Username : %s\n", modifyUID)
-	fmt.Printf("  Password : %s\n", userPass)
-	fmt.Printf("%s\n", strings.Repeat("=", 45))
-
-	return nil
+		return nil
+	})
 }
 
 func runModifyEmail(cmd *cobra.Command, args []string) error {
-	cfg, err := config.Load()
-	if err != nil {
-		return err
-	}
+	return withLDAPClient(func(cfg *config.Config, client *ldapclient.Client) error {
+		newEmail := args[0]
 
-	adminPass, err := cfg.LoadAdminPassword()
-	if err != nil {
-		return err
-	}
+		if err := client.ChangeEmail(modifyUID, newEmail); err != nil {
+			return err
+		}
 
-	newEmail := args[0]
+		fmt.Printf("\n%s\n", strings.Repeat("=", 45))
+		fmt.Printf("  Email changed successfully!\n")
+		fmt.Printf("  Username : %s\n", modifyUID)
+		fmt.Printf("  Email    : %s\n", newEmail)
+		fmt.Printf("%s\n", strings.Repeat("=", 45))
 
-	client, err := ldapclient.NewClient(cfg, adminPass)
-	if err != nil {
-		return err
-	}
-	defer client.Close()
-
-	if err := client.ChangeEmail(modifyUID, newEmail); err != nil {
-		return err
-	}
-
-	fmt.Printf("\n%s\n", strings.Repeat("=", 45))
-	fmt.Printf("  Email changed successfully!\n")
-	fmt.Printf("  Username : %s\n", modifyUID)
-	fmt.Printf("  Email    : %s\n", newEmail)
-	fmt.Printf("%s\n", strings.Repeat("=", 45))
-
-	return nil
+		return nil
+	})
 }
 
 func runModifyAddGroup(cmd *cobra.Command, args []string) error {
-	cfg, err := config.Load()
-	if err != nil {
-		return err
-	}
+	return withLDAPClient(func(cfg *config.Config, client *ldapclient.Client) error {
+		fmt.Printf("\n%s\n", strings.Repeat("=", 45))
+		fmt.Printf("  Adding user to groups...\n")
 
-	adminPass, err := cfg.LoadAdminPassword()
-	if err != nil {
-		return err
-	}
-
-	client, err := ldapclient.NewClient(cfg, adminPass)
-	if err != nil {
-		return err
-	}
-	defer client.Close()
-
-	fmt.Printf("\n%s\n", strings.Repeat("=", 45))
-	fmt.Printf("  Adding user to groups...\n")
-
-	for _, group := range args {
-		if err := client.AddToGroup(modifyUID, group); err != nil {
-			fmt.Printf("  [!] %v\n", err)
-		} else {
-			fmt.Printf("  [+] Added to group '%s'\n", group)
+		for _, group := range args {
+			if err := client.AddToGroup(modifyUID, group); err != nil {
+				fmt.Printf("  [!] %v\n", err)
+			} else {
+				fmt.Printf("  [+] Added to group '%s'\n", group)
+			}
 		}
-	}
 
-	fmt.Printf("%s\n", strings.Repeat("=", 45))
+		fmt.Printf("%s\n", strings.Repeat("=", 45))
 
-	return nil
+		return nil
+	})
 }
 
 func runModifyRemoveGroup(cmd *cobra.Command, args []string) error {
-	cfg, err := config.Load()
-	if err != nil {
-		return err
-	}
+	return withLDAPClient(func(cfg *config.Config, client *ldapclient.Client) error {
+		fmt.Printf("\n%s\n", strings.Repeat("=", 45))
+		fmt.Printf("  Removing user from groups...\n")
 
-	adminPass, err := cfg.LoadAdminPassword()
-	if err != nil {
-		return err
-	}
-
-	client, err := ldapclient.NewClient(cfg, adminPass)
-	if err != nil {
-		return err
-	}
-	defer client.Close()
-
-	fmt.Printf("\n%s\n", strings.Repeat("=", 45))
-	fmt.Printf("  Removing user from groups...\n")
-
-	for _, group := range args {
-		if err := client.RemoveFromGroup(modifyUID, group); err != nil {
-			fmt.Printf("  [!] %v\n", err)
-		} else {
-			fmt.Printf("  [-] Removed from group '%s'\n", group)
+		for _, group := range args {
+			if err := client.RemoveFromGroup(modifyUID, group); err != nil {
+				fmt.Printf("  [!] %v\n", err)
+			} else {
+				fmt.Printf("  [-] Removed from group '%s'\n", group)
+			}
 		}
-	}
 
-	fmt.Printf("%s\n", strings.Repeat("=", 45))
+		fmt.Printf("%s\n", strings.Repeat("=", 45))
 
-	return nil
+		return nil
+	})
 }
