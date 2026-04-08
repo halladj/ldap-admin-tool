@@ -131,3 +131,76 @@ func (c *Client) AddToGroup(uid, groupName string) error {
 
 	return nil
 }
+
+func (c *Client) RemoveFromGroup(uid, groupName string) error {
+	groupDN := fmt.Sprintf("cn=%s,%s", groupName, c.cfg.GroupOU)
+
+	modReq := ldap.NewModifyRequest(groupDN, nil)
+	modReq.Delete("memberUid", []string{uid})
+
+	if err := c.conn.Modify(modReq); err != nil {
+		return fmt.Errorf("failed to remove from group '%s': %w", groupName, err)
+	}
+
+	return nil
+}
+
+func (c *Client) ChangePassword(uid, newPassword string) error {
+	searchReq := ldap.NewSearchRequest(
+		c.cfg.PeopleOU,
+		ldap.ScopeWholeSubtree, ldap.NeverDerefAliases, 0, 0, false,
+		fmt.Sprintf("(uid=%s)", ldap.EscapeFilter(uid)),
+		[]string{"dn"},
+		nil,
+	)
+
+	result, err := c.conn.Search(searchReq)
+	if err != nil {
+		return fmt.Errorf("failed to search for user '%s': %w", uid, err)
+	}
+
+	if len(result.Entries) == 0 {
+		return fmt.Errorf("user '%s' not found", uid)
+	}
+
+	userDN := result.Entries[0].DN
+
+	modReq := ldap.NewModifyRequest(userDN, nil)
+	modReq.Replace("userPassword", []string{newPassword})
+
+	if err := c.conn.Modify(modReq); err != nil {
+		return fmt.Errorf("failed to change password: %w", err)
+	}
+
+	return nil
+}
+
+func (c *Client) ChangeEmail(uid, newEmail string) error {
+	searchReq := ldap.NewSearchRequest(
+		c.cfg.PeopleOU,
+		ldap.ScopeWholeSubtree, ldap.NeverDerefAliases, 0, 0, false,
+		fmt.Sprintf("(uid=%s)", ldap.EscapeFilter(uid)),
+		[]string{"dn"},
+		nil,
+	)
+
+	result, err := c.conn.Search(searchReq)
+	if err != nil {
+		return fmt.Errorf("failed to search for user '%s': %w", uid, err)
+	}
+
+	if len(result.Entries) == 0 {
+		return fmt.Errorf("user '%s' not found", uid)
+	}
+
+	userDN := result.Entries[0].DN
+
+	modReq := ldap.NewModifyRequest(userDN, nil)
+	modReq.Replace("mail", []string{newEmail})
+
+	if err := c.conn.Modify(modReq); err != nil {
+		return fmt.Errorf("failed to change email: %w", err)
+	}
+
+	return nil
+}
