@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -82,11 +81,9 @@ func runModifyPassword(cmd *cobra.Command, args []string) error {
 			return err
 		}
 
-		fmt.Printf("\n%s\n", strings.Repeat("=", 45))
-		fmt.Printf("  Password changed successfully!\n")
-		fmt.Printf("  Username : %s\n", modifyUID)
-		fmt.Printf("  Password : %s\n", userPass)
-		fmt.Printf("%s\n", strings.Repeat("=", 45))
+		printBanner("Password changed successfully!",
+			"Username", modifyUID,
+			"Password", userPass)
 
 		return nil
 	})
@@ -100,11 +97,9 @@ func runModifyEmail(cmd *cobra.Command, args []string) error {
 			return err
 		}
 
-		fmt.Printf("\n%s\n", strings.Repeat("=", 45))
-		fmt.Printf("  Email changed successfully!\n")
-		fmt.Printf("  Username : %s\n", modifyUID)
-		fmt.Printf("  Email    : %s\n", newEmail)
-		fmt.Printf("%s\n", strings.Repeat("=", 45))
+		printBanner("Email changed successfully!",
+			"Username", modifyUID,
+			"Email", newEmail)
 
 		return nil
 	})
@@ -112,8 +107,7 @@ func runModifyEmail(cmd *cobra.Command, args []string) error {
 
 func runModifyAddGroup(cmd *cobra.Command, args []string) error {
 	return withLDAPClient(func(cfg *config.Config, client *ldapclient.Client) error {
-		fmt.Printf("\n%s\n", strings.Repeat("=", 45))
-		fmt.Printf("  Adding user to groups...\n")
+		printProgress("Adding user to groups...")
 
 		for _, group := range args {
 			if err := client.AddToGroup(modifyUID, group); err != nil {
@@ -123,7 +117,7 @@ func runModifyAddGroup(cmd *cobra.Command, args []string) error {
 			}
 		}
 
-		fmt.Printf("%s\n", strings.Repeat("=", 45))
+		printDone()
 
 		return nil
 	})
@@ -131,8 +125,7 @@ func runModifyAddGroup(cmd *cobra.Command, args []string) error {
 
 func runModifyRemoveGroup(cmd *cobra.Command, args []string) error {
 	return withLDAPClient(func(cfg *config.Config, client *ldapclient.Client) error {
-		fmt.Printf("\n%s\n", strings.Repeat("=", 45))
-		fmt.Printf("  Removing user from groups...\n")
+		printProgress("Removing user from groups...")
 
 		for _, group := range args {
 			if err := client.RemoveFromGroup(modifyUID, group); err != nil {
@@ -142,7 +135,7 @@ func runModifyRemoveGroup(cmd *cobra.Command, args []string) error {
 			}
 		}
 
-		fmt.Printf("%s\n", strings.Repeat("=", 45))
+		printDone()
 
 		return nil
 	})

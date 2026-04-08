@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -81,11 +80,9 @@ func runGroupsCreate(cmd *cobra.Command, args []string) error {
 			return err
 		}
 
-		fmt.Printf("\n%s\n", strings.Repeat("=", 45))
-		fmt.Printf("  Group created successfully!\n")
-		fmt.Printf("  Group name : %s\n", groupName)
-		fmt.Printf("  GID        : %d\n", gid)
-		fmt.Printf("%s\n", strings.Repeat("=", 45))
+		printBanner("Group created successfully!",
+			"Group name", groupName,
+			"GID", fmt.Sprintf("%d", gid))
 
 		return nil
 	})
@@ -98,10 +95,8 @@ func runGroupsRemove(cmd *cobra.Command, args []string) error {
 			return err
 		}
 
-		fmt.Printf("\n%s\n", strings.Repeat("=", 45))
-		fmt.Printf("  Group removed successfully!\n")
-		fmt.Printf("  Group name : %s\n", groupName)
-		fmt.Printf("%s\n", strings.Repeat("=", 45))
+		printBanner("Group removed successfully!",
+			"Group name", groupName)
 
 		return nil
 	})
@@ -111,8 +106,7 @@ func runGroupsAddUsers(cmd *cobra.Command, args []string) error {
 	groupName := args[0]
 	users := args[1:]
 	return withLDAPClient(func(cfg *config.Config, client *ldapclient.Client) error {
-		fmt.Printf("\n%s\n", strings.Repeat("=", 45))
-		fmt.Printf("  Adding users to group '%s'...\n", groupName)
+		printProgress(fmt.Sprintf("Adding users to group '%s'...", groupName))
 
 		for _, uid := range users {
 			if err := client.AddToGroup(uid, groupName); err != nil {
@@ -122,7 +116,7 @@ func runGroupsAddUsers(cmd *cobra.Command, args []string) error {
 			}
 		}
 
-		fmt.Printf("%s\n", strings.Repeat("=", 45))
+		printDone()
 
 		return nil
 	})
@@ -132,8 +126,7 @@ func runGroupsRemoveUsers(cmd *cobra.Command, args []string) error {
 	groupName := args[0]
 	users := args[1:]
 	return withLDAPClient(func(cfg *config.Config, client *ldapclient.Client) error {
-		fmt.Printf("\n%s\n", strings.Repeat("=", 45))
-		fmt.Printf("  Removing users from group '%s'...\n", groupName)
+		printProgress(fmt.Sprintf("Removing users from group '%s'...", groupName))
 
 		for _, uid := range users {
 			if err := client.RemoveFromGroup(uid, groupName); err != nil {
@@ -143,7 +136,7 @@ func runGroupsRemoveUsers(cmd *cobra.Command, args []string) error {
 			}
 		}
 
-		fmt.Printf("%s\n", strings.Repeat("=", 45))
+		printDone()
 
 		return nil
 	})

@@ -143,15 +143,15 @@ func runUserCreate(cmd *cobra.Command, args []string) error {
 		}
 
 		// Summary
-		fmt.Printf("\n%s\n", strings.Repeat("=", 45))
-		fmt.Printf("  Account created successfully!\n")
-		fmt.Printf("  Username : %s\n", uid)
-		fmt.Printf("  Password : %s\n", userPass)
-		fmt.Printf("  Email    : %s\n", email)
-		if len(groupList) > 0 {
-			fmt.Printf("  Groups   : %s\n", strings.Join(groupList, ", "))
+		rows := []string{
+			"Username", uid,
+			"Password", userPass,
+			"Email", email,
 		}
-		fmt.Printf("%s\n", strings.Repeat("=", 45))
+		if len(groupList) > 0 {
+			rows = append(rows, "Groups", strings.Join(groupList, ", "))
+		}
+		printBanner("Account created successfully!", rows...)
 
 		return nil
 	})
