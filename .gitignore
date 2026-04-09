@@ -33,3 +33,10 @@ admin_pass
 
 # Generated files
 *.pdf
+
+# Config files (keep out of public repo)
+config.yaml
+config.yml
+
+# Personal notes/drafts
+*.draft.md

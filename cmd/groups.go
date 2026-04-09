@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -52,6 +53,15 @@ var groupsRemoveUsersCmd = &cobra.Command{
 	RunE: runGroupsRemoveUsers,
 }
 
+var groupsQueryCmd = &cobra.Command{
+	Use:   "query [name]",
+	Short: "Query an LDAP group, or list all groups if no name given",
+	Args:  cobra.MaximumNArgs(1),
+	Example: `  ldap-admin-tool groups query             # list all groups
+  ldap-admin-tool groups query printing-a  # show one group`,
+	RunE: runGroupsQuery,
+}
+
 func init() {
 	groupsCreateCmd.Flags().IntVar(&groupsGID, "gid", 0, "Group ID (auto-selected if not provided)")
 
@@ -59,6 +69,7 @@ func init() {
 	groupsCmd.AddCommand(groupsRemoveCmd)
 	groupsCmd.AddCommand(groupsAddUsersCmd)
 	groupsCmd.AddCommand(groupsRemoveUsersCmd)
+	groupsCmd.AddCommand(groupsQueryCmd)
 
 	rootCmd.AddCommand(groupsCmd)
 }
@@ -137,6 +148,37 @@ func runGroupsRemoveUsers(cmd *cobra.Command, args []string) error {
 		}
 
 		printDone()
+
+		return nil
+	})
+}
+
+func runGroupsQuery(cmd *cobra.Command, args []string) error {
+	return withLDAPClient(func(cfg *config.Config, client *ldapclient.Client) error {
+		if len(args) == 1 {
+			g, err := client.QueryGroup(args[0])
+			if err != nil {
+				return err
+			}
+			printGroupDetails(g)
+			return nil
+		}
+
+		groups, err := client.ListGroups()
+		if err != nil {
+			return err
+		}
+
+		fmt.Printf("\n%-30s %-10s %-s\n", "Group", "GID", "Members")
+		fmt.Println(strings.Repeat("-", 62))
+		for _, g := range groups {
+			members := strings.Join(g.Members, ", ")
+			if members == "" {
+				members = "-"
+			}
+			fmt.Printf("%-30s %-10d %s\n", g.Name, g.GID, members)
+		}
+		fmt.Printf("\nTotal: %d group(s)\n", len(groups))
 
 		return nil
 	})
