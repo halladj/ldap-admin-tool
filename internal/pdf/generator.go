@@ -6,18 +6,10 @@ import (
 
 	"github.com/jung-kurt/gofpdf"
 	"github.com/halladj/ldap-admin-tool/internal/config"
+	"github.com/halladj/ldap-admin-tool/internal/types"
 )
 
-type UserInfo struct {
-	FirstName string
-	LastName  string
-	UID       string
-	Email     string
-	Password  string
-	Groups    []string
-}
-
-func Generate(cfg *config.Config, user UserInfo) (string, error) {
+func Generate(cfg *config.Config, user types.User) ([]byte, error) {
 	pdf := gofpdf.New("P", "mm", "A4", "")
 	pdf.AddPage()
 
@@ -75,14 +67,21 @@ func Generate(cfg *config.Config, user UserInfo) (string, error) {
 
 	tmpFile, err := os.CreateTemp("", fmt.Sprintf("ldap_%s_*.pdf", user.UID))
 	if err != nil {
-		return "", fmt.Errorf("failed to create temp file: %w", err)
+		return nil, fmt.Errorf("failed to create temp file: %w", err)
 	}
+	tmpPath := tmpFile.Name()
 	tmpFile.Close()
+	defer os.Remove(tmpPath) // always cleanup temp file
 
-	if err := pdf.OutputFileAndClose(tmpFile.Name()); err != nil {
-		os.Remove(tmpFile.Name())
-		return "", fmt.Errorf("failed to generate PDF: %w", err)
+	if err := pdf.OutputFileAndClose(tmpPath); err != nil {
+		return nil, fmt.Errorf("failed to generate PDF: %w", err)
 	}
 
-	return tmpFile.Name(), nil
+	// Read PDF content into memory
+	data, err := os.ReadFile(tmpPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read generated PDF: %w", err)
+	}
+
+	return data, nil
 }

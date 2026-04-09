@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/spf13/viper"
@@ -18,13 +19,17 @@ type Config struct {
 	SenderEmail   string `mapstructure:"sender_email"`
 	DefaultShell  string `mapstructure:"default_shell"`
 	DefaultGID    int    `mapstructure:"default_gid"`
+	MinUIDNumber  int    `mapstructure:"min_uid_number"`
+	MinGIDNumber  int    `mapstructure:"min_gid_number"`
 }
 
 func Load() (*Config, error) {
 	viper.SetConfigName("config")
 	viper.SetConfigType("yaml")
 	viper.AddConfigPath("/etc/ldap-admin-tool")
-	viper.AddConfigPath("$HOME/.ldap-admin-tool")
+	if home, err := os.UserHomeDir(); err == nil {
+		viper.AddConfigPath(filepath.Join(home, ".ldap-admin-tool"))
+	}
 	viper.AddConfigPath(".")
 
 	// Defaults
@@ -34,9 +39,11 @@ func Load() (*Config, error) {
 	viper.SetDefault("group_ou", "ou=group,dc=your-domain,dc=org")
 	viper.SetDefault("admin_dn", "cn=admin,dc=your-domain,dc=org")
 	viper.SetDefault("admin_pass_file", "/etc/ldap/admin_pass")
-	viper.SetDefault("sender_email", "no-replay@your-domain.org")
+	viper.SetDefault("sender_email", "noreply@your-domain.org")
 	viper.SetDefault("default_shell", "/bin/bash")
 	viper.SetDefault("default_gid", 10008)
+	viper.SetDefault("min_uid_number", 10000)
+	viper.SetDefault("min_gid_number", 10000)
 
 	// Environment variables: LDAP_ADMIN_TOOL_LDAP_SERVER, etc.
 	viper.SetEnvPrefix("LDAP_ADMIN_TOOL")

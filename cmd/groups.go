@@ -53,6 +53,15 @@ var groupsRemoveUsersCmd = &cobra.Command{
 	RunE: runGroupsRemoveUsers,
 }
 
+var groupsQueryCmd = &cobra.Command{
+	Use:   "query [name]",
+	Short: "Query an LDAP group, or list all groups if no name given",
+	Args:  cobra.MaximumNArgs(1),
+	Example: `  ldap-admin-tool groups query             # list all groups
+  ldap-admin-tool groups query printing-a  # show one group`,
+	RunE: runGroupsQuery,
+}
+
 func init() {
 	groupsCreateCmd.Flags().IntVar(&groupsGID, "gid", 0, "Group ID (auto-selected if not provided)")
 
@@ -60,150 +69,117 @@ func init() {
 	groupsCmd.AddCommand(groupsRemoveCmd)
 	groupsCmd.AddCommand(groupsAddUsersCmd)
 	groupsCmd.AddCommand(groupsRemoveUsersCmd)
+	groupsCmd.AddCommand(groupsQueryCmd)
 
 	rootCmd.AddCommand(groupsCmd)
 }
 
 func runGroupsCreate(cmd *cobra.Command, args []string) error {
 	groupName := args[0]
+	return withLDAPClient(func(cfg *config.Config, client *ldapclient.Client) error {
+		// If GID not provided, get next available
+		gid := groupsGID
+		if gid == 0 {
+			var err error
+			gid, err = client.GetNextGIDNumber()
+			if err != nil {
+				return err
+			}
+		}
 
-	cfg, err := config.Load()
-	if err != nil {
-		return err
-	}
-
-	adminPass, err := cfg.LoadAdminPassword()
-	if err != nil {
-		return err
-	}
-
-	client, err := ldapclient.NewClient(cfg, adminPass)
-	if err != nil {
-		return err
-	}
-	defer client.Close()
-
-	// If GID not provided, get next available
-	gid := groupsGID
-	if gid == 0 {
-		gid, err = client.GetNextGIDNumber()
-		if err != nil {
+		if err := client.CreateGroup(groupName, gid); err != nil {
 			return err
 		}
-	}
 
-	if err := client.CreateGroup(groupName, gid); err != nil {
-		return err
-	}
+		printBanner("Group created successfully!",
+			"Group name", groupName,
+			"GID", fmt.Sprintf("%d", gid))
 
-	fmt.Printf("\n%s\n", strings.Repeat("=", 45))
-	fmt.Printf("  Group created successfully!\n")
-	fmt.Printf("  Group name : %s\n", groupName)
-	fmt.Printf("  GID        : %d\n", gid)
-	fmt.Printf("%s\n", strings.Repeat("=", 45))
-
-	return nil
+		return nil
+	})
 }
 
 func runGroupsRemove(cmd *cobra.Command, args []string) error {
 	groupName := args[0]
+	return withLDAPClient(func(cfg *config.Config, client *ldapclient.Client) error {
+		if err := client.RemoveGroup(groupName); err != nil {
+			return err
+		}
 
-	cfg, err := config.Load()
-	if err != nil {
-		return err
-	}
+		printBanner("Group removed successfully!",
+			"Group name", groupName)
 
-	adminPass, err := cfg.LoadAdminPassword()
-	if err != nil {
-		return err
-	}
-
-	client, err := ldapclient.NewClient(cfg, adminPass)
-	if err != nil {
-		return err
-	}
-	defer client.Close()
-
-	if err := client.RemoveGroup(groupName); err != nil {
-		return err
-	}
-
-	fmt.Printf("\n%s\n", strings.Repeat("=", 45))
-	fmt.Printf("  Group removed successfully!\n")
-	fmt.Printf("  Group name : %s\n", groupName)
-	fmt.Printf("%s\n", strings.Repeat("=", 45))
-
-	return nil
+		return nil
+	})
 }
 
 func runGroupsAddUsers(cmd *cobra.Command, args []string) error {
 	groupName := args[0]
 	users := args[1:]
+	return withLDAPClient(func(cfg *config.Config, client *ldapclient.Client) error {
+		printProgress(fmt.Sprintf("Adding users to group '%s'...", groupName))
 
-	cfg, err := config.Load()
-	if err != nil {
-		return err
-	}
-
-	adminPass, err := cfg.LoadAdminPassword()
-	if err != nil {
-		return err
-	}
-
-	client, err := ldapclient.NewClient(cfg, adminPass)
-	if err != nil {
-		return err
-	}
-	defer client.Close()
-
-	fmt.Printf("\n%s\n", strings.Repeat("=", 45))
-	fmt.Printf("  Adding users to group '%s'...\n", groupName)
-
-	for _, uid := range users {
-		if err := client.AddToGroup(uid, groupName); err != nil {
-			fmt.Printf("  [!] %v\n", err)
-		} else {
-			fmt.Printf("  [+] Added '%s' to group\n", uid)
+		for _, uid := range users {
+			if err := client.AddToGroup(uid, groupName); err != nil {
+				fmt.Printf("  [!] %v\n", err)
+			} else {
+				fmt.Printf("  [+] Added '%s' to group\n", uid)
+			}
 		}
-	}
 
-	fmt.Printf("%s\n", strings.Repeat("=", 45))
+		printDone()
 
-	return nil
+		return nil
+	})
 }
 
 func runGroupsRemoveUsers(cmd *cobra.Command, args []string) error {
 	groupName := args[0]
 	users := args[1:]
+	return withLDAPClient(func(cfg *config.Config, client *ldapclient.Client) error {
+		printProgress(fmt.Sprintf("Removing users from group '%s'...", groupName))
 
-	cfg, err := config.Load()
-	if err != nil {
-		return err
-	}
-
-	adminPass, err := cfg.LoadAdminPassword()
-	if err != nil {
-		return err
-	}
-
-	client, err := ldapclient.NewClient(cfg, adminPass)
-	if err != nil {
-		return err
-	}
-	defer client.Close()
-
-	fmt.Printf("\n%s\n", strings.Repeat("=", 45))
-	fmt.Printf("  Removing users from group '%s'...\n", groupName)
-
-	for _, uid := range users {
-		if err := client.RemoveFromGroup(uid, groupName); err != nil {
-			fmt.Printf("  [!] %v\n", err)
-		} else {
-			fmt.Printf("  [-] Removed '%s' from group\n", uid)
+		for _, uid := range users {
+			if err := client.RemoveFromGroup(uid, groupName); err != nil {
+				fmt.Printf("  [!] %v\n", err)
+			} else {
+				fmt.Printf("  [-] Removed '%s' from group\n", uid)
+			}
 		}
-	}
 
-	fmt.Printf("%s\n", strings.Repeat("=", 45))
+		printDone()
 
-	return nil
+		return nil
+	})
+}
+
+func runGroupsQuery(cmd *cobra.Command, args []string) error {
+	return withLDAPClient(func(cfg *config.Config, client *ldapclient.Client) error {
+		if len(args) == 1 {
+			g, err := client.QueryGroup(args[0])
+			if err != nil {
+				return err
+			}
+			printGroupDetails(g)
+			return nil
+		}
+
+		groups, err := client.ListGroups()
+		if err != nil {
+			return err
+		}
+
+		fmt.Printf("\n%-30s %-10s %-s\n", "Group", "GID", "Members")
+		fmt.Println(strings.Repeat("-", 62))
+		for _, g := range groups {
+			members := strings.Join(g.Members, ", ")
+			if members == "" {
+				members = "-"
+			}
+			fmt.Printf("%-30s %-10d %s\n", g.Name, g.GID, members)
+		}
+		fmt.Printf("\nTotal: %d group(s)\n", len(groups))
+
+		return nil
+	})
 }

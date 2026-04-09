@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-ldap/ldap/v3"
 	"github.com/halladj/ldap-admin-tool/internal/config"
+	"github.com/halladj/ldap-admin-tool/internal/types"
 )
 
 type Client struct {
@@ -15,17 +16,11 @@ type Client struct {
 	cfg  *config.Config
 }
 
-type User struct {
-	FirstName string
-	LastName  string
-	UID       string
-	Email     string
-	Password  string
-	GID       int
-}
-
 func NewClient(cfg *config.Config, adminPass string) (*Client, error) {
-	parsed, _ := url.Parse(cfg.LDAPServer)
+	parsed, err := url.Parse(cfg.LDAPServer)
+	if err != nil || parsed.Hostname() == "" {
+		return nil, fmt.Errorf("invalid LDAP server URL %q: must include scheme (e.g. ldaps://host:636)", cfg.LDAPServer)
+	}
 	serverName := parsed.Hostname()
 
 	conn, err := ldap.DialURL(cfg.LDAPServer, ldap.DialWithTLSConfig(&tls.Config{
@@ -48,32 +43,36 @@ func (c *Client) Close() {
 	c.conn.Close()
 }
 
-func (c *Client) GetNextUIDNumber() (int, error) {
+// nextIDNumber finds the highest existing ID number in a search result and returns next available ID.
+func (c *Client) nextIDNumber(searchBase, filter, attr string, floor int) (int, error) {
 	req := ldap.NewSearchRequest(
-		c.cfg.PeopleOU,
+		searchBase,
 		ldap.ScopeWholeSubtree, ldap.NeverDerefAliases, 0, 0, false,
-		"(objectClass=posixAccount)",
-		[]string{"uidNumber"},
+		filter,
+		[]string{attr},
 		nil,
 	)
 
 	result, err := c.conn.Search(req)
 	if err != nil {
-		return 0, fmt.Errorf("failed to search for uidNumbers: %w", err)
+		return 0, fmt.Errorf("failed to search %s: %w", searchBase, err)
 	}
 
-	maxUID := 10000
+	max := floor
 	for _, entry := range result.Entries {
-		uidStr := entry.GetAttributeValue("uidNumber")
-		if uid, err := strconv.Atoi(uidStr); err == nil && uid > maxUID {
-			maxUID = uid
+		if n, err := strconv.Atoi(entry.GetAttributeValue(attr)); err == nil && n > max {
+			max = n
 		}
 	}
 
-	return maxUID + 1, nil
+	return max + 1, nil
 }
 
-func (c *Client) CreateUser(user User, uidNumber int) (string, error) {
+func (c *Client) GetNextUIDNumber() (int, error) {
+	return c.nextIDNumber(c.cfg.PeopleOU, "(objectClass=posixAccount)", "uidNumber", c.cfg.MinUIDNumber)
+}
+
+func (c *Client) CreateUser(user types.User, uidNumber int) (string, error) {
 	cn := fmt.Sprintf("%s %s", user.FirstName, user.LastName)
 	dn := fmt.Sprintf("cn=%s,%s", cn, c.cfg.PeopleOU)
 	homeDir := fmt.Sprintf("/home/%s", user.UID)
@@ -145,8 +144,9 @@ func (c *Client) RemoveFromGroup(uid, groupName string) error {
 	return nil
 }
 
-func (c *Client) ChangePassword(uid, newPassword string) error {
-	searchReq := ldap.NewSearchRequest(
+// findUserDN searches for a user by uid and returns their DN
+func (c *Client) findUserDN(uid string) (string, error) {
+	req := ldap.NewSearchRequest(
 		c.cfg.PeopleOU,
 		ldap.ScopeWholeSubtree, ldap.NeverDerefAliases, 0, 0, false,
 		fmt.Sprintf("(uid=%s)", ldap.EscapeFilter(uid)),
@@ -154,18 +154,25 @@ func (c *Client) ChangePassword(uid, newPassword string) error {
 		nil,
 	)
 
-	result, err := c.conn.Search(searchReq)
+	result, err := c.conn.Search(req)
 	if err != nil {
-		return fmt.Errorf("failed to search for user '%s': %w", uid, err)
+		return "", fmt.Errorf("failed to search for user '%s': %w", uid, err)
 	}
 
 	if len(result.Entries) == 0 {
-		return fmt.Errorf("user '%s' not found", uid)
+		return "", fmt.Errorf("user '%s' not found", uid)
 	}
 
-	userDN := result.Entries[0].DN
+	return result.Entries[0].DN, nil
+}
 
-	modReq := ldap.NewModifyRequest(userDN, nil)
+func (c *Client) ChangePassword(uid, newPassword string) error {
+	dn, err := c.findUserDN(uid)
+	if err != nil {
+		return err
+	}
+
+	modReq := ldap.NewModifyRequest(dn, nil)
 	modReq.Replace("userPassword", []string{newPassword})
 
 	if err := c.conn.Modify(modReq); err != nil {
@@ -176,26 +183,12 @@ func (c *Client) ChangePassword(uid, newPassword string) error {
 }
 
 func (c *Client) ChangeEmail(uid, newEmail string) error {
-	searchReq := ldap.NewSearchRequest(
-		c.cfg.PeopleOU,
-		ldap.ScopeWholeSubtree, ldap.NeverDerefAliases, 0, 0, false,
-		fmt.Sprintf("(uid=%s)", ldap.EscapeFilter(uid)),
-		[]string{"dn"},
-		nil,
-	)
-
-	result, err := c.conn.Search(searchReq)
+	dn, err := c.findUserDN(uid)
 	if err != nil {
-		return fmt.Errorf("failed to search for user '%s': %w", uid, err)
+		return err
 	}
 
-	if len(result.Entries) == 0 {
-		return fmt.Errorf("user '%s' not found", uid)
-	}
-
-	userDN := result.Entries[0].DN
-
-	modReq := ldap.NewModifyRequest(userDN, nil)
+	modReq := ldap.NewModifyRequest(dn, nil)
 	modReq.Replace("mail", []string{newEmail})
 
 	if err := c.conn.Modify(modReq); err != nil {
@@ -206,31 +199,7 @@ func (c *Client) ChangeEmail(uid, newEmail string) error {
 }
 
 func (c *Client) GetNextGIDNumber() (int, error) {
-	searchReq := ldap.NewSearchRequest(
-		c.cfg.GroupOU,
-		ldap.ScopeWholeSubtree, ldap.NeverDerefAliases, 0, 0, false,
-		"(objectClass=posixGroup)",
-		[]string{"gidNumber"},
-		nil,
-	)
-
-	result, err := c.conn.Search(searchReq)
-	if err != nil {
-		return 0, fmt.Errorf("failed to search groups: %w", err)
-	}
-
-	maxGID := 10000
-	for _, entry := range result.Entries {
-		gidStr := entry.GetAttributeValue("gidNumber")
-		if gidStr != "" {
-			gid, _ := strconv.Atoi(gidStr)
-			if gid > maxGID {
-				maxGID = gid
-			}
-		}
-	}
-
-	return maxGID + 1, nil
+	return c.nextIDNumber(c.cfg.GroupOU, "(objectClass=posixGroup)", "gidNumber", c.cfg.MinGIDNumber)
 }
 
 func (c *Client) CreateGroup(name string, gid int) error {
@@ -258,4 +227,151 @@ func (c *Client) RemoveGroup(name string) error {
 	}
 
 	return nil
+}
+
+func (c *Client) QueryUser(uid string) (*types.UserDetails, error) {
+	req := ldap.NewSearchRequest(
+		c.cfg.PeopleOU,
+		ldap.ScopeWholeSubtree, ldap.NeverDerefAliases, 0, 0, false,
+		fmt.Sprintf("(uid=%s)", ldap.EscapeFilter(uid)),
+		[]string{"dn", "uid", "givenName", "sn", "mail", "uidNumber", "gidNumber", "homeDirectory", "loginShell"},
+		nil,
+	)
+
+	result, err := c.conn.Search(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to search for user '%s': %w", uid, err)
+	}
+	if len(result.Entries) == 0 {
+		return nil, fmt.Errorf("user '%s' not found", uid)
+	}
+
+	e := result.Entries[0]
+	uidNum, _ := strconv.Atoi(e.GetAttributeValue("uidNumber"))
+	gidNum, _ := strconv.Atoi(e.GetAttributeValue("gidNumber"))
+
+	// Find group memberships
+	groupReq := ldap.NewSearchRequest(
+		c.cfg.GroupOU,
+		ldap.ScopeWholeSubtree, ldap.NeverDerefAliases, 0, 0, false,
+		fmt.Sprintf("(memberUid=%s)", ldap.EscapeFilter(uid)),
+		[]string{"cn"},
+		nil,
+	)
+	groupResult, err := c.conn.Search(groupReq)
+	if err != nil {
+		return nil, fmt.Errorf("failed to search groups for user '%s': %w", uid, err)
+	}
+	var groups []string
+	for _, g := range groupResult.Entries {
+		groups = append(groups, g.GetAttributeValue("cn"))
+	}
+
+	return &types.UserDetails{
+		DN:        e.DN,
+		UID:       e.GetAttributeValue("uid"),
+		FirstName: e.GetAttributeValue("givenName"),
+		LastName:  e.GetAttributeValue("sn"),
+		Email:     e.GetAttributeValue("mail"),
+		UIDNumber: uidNum,
+		GIDNumber: gidNum,
+		HomeDir:   e.GetAttributeValue("homeDirectory"),
+		Shell:     e.GetAttributeValue("loginShell"),
+		Groups:    groups,
+	}, nil
+}
+
+func (c *Client) DeleteUser(uid string) error {
+	dn, err := c.findUserDN(uid)
+	if err != nil {
+		return err
+	}
+
+	if err := c.conn.Del(ldap.NewDelRequest(dn, nil)); err != nil {
+		return fmt.Errorf("failed to delete user '%s': %w", uid, err)
+	}
+
+	return nil
+}
+
+func (c *Client) ListUsers() ([]*types.UserDetails, error) {
+	req := ldap.NewSearchRequest(
+		c.cfg.PeopleOU,
+		ldap.ScopeWholeSubtree, ldap.NeverDerefAliases, 0, 0, false,
+		"(objectClass=posixAccount)",
+		[]string{"uid", "givenName", "sn", "mail", "uidNumber"},
+		nil,
+	)
+	result, err := c.conn.Search(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list users: %w", err)
+	}
+
+	var users []*types.UserDetails
+	for _, e := range result.Entries {
+		uidNum, _ := strconv.Atoi(e.GetAttributeValue("uidNumber"))
+		users = append(users, &types.UserDetails{
+			UID:       e.GetAttributeValue("uid"),
+			FirstName: e.GetAttributeValue("givenName"),
+			LastName:  e.GetAttributeValue("sn"),
+			Email:     e.GetAttributeValue("mail"),
+			UIDNumber: uidNum,
+		})
+	}
+	return users, nil
+}
+
+func (c *Client) ListGroups() ([]*types.GroupDetails, error) {
+	req := ldap.NewSearchRequest(
+		c.cfg.GroupOU,
+		ldap.ScopeWholeSubtree, ldap.NeverDerefAliases, 0, 0, false,
+		"(objectClass=posixGroup)",
+		[]string{"cn", "gidNumber", "memberUid"},
+		nil,
+	)
+	result, err := c.conn.Search(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list groups: %w", err)
+	}
+
+	var groups []*types.GroupDetails
+	for _, e := range result.Entries {
+		gid, _ := strconv.Atoi(e.GetAttributeValue("gidNumber"))
+		groups = append(groups, &types.GroupDetails{
+			Name:    e.GetAttributeValue("cn"),
+			GID:     gid,
+			Members: e.GetAttributeValues("memberUid"),
+		})
+	}
+	return groups, nil
+}
+
+func (c *Client) QueryGroup(name string) (*types.GroupDetails, error) {
+	groupDN := fmt.Sprintf("cn=%s,%s", name, c.cfg.GroupOU)
+
+	req := ldap.NewSearchRequest(
+		groupDN,
+		ldap.ScopeBaseObject, ldap.NeverDerefAliases, 0, 0, false,
+		"(objectClass=posixGroup)",
+		[]string{"cn", "gidNumber", "memberUid"},
+		nil,
+	)
+
+	result, err := c.conn.Search(req)
+	if err != nil {
+		return nil, fmt.Errorf("group '%s' not found: %w", name, err)
+	}
+	if len(result.Entries) == 0 {
+		return nil, fmt.Errorf("group '%s' not found", name)
+	}
+
+	e := result.Entries[0]
+	gid, _ := strconv.Atoi(e.GetAttributeValue("gidNumber"))
+
+	return &types.GroupDetails{
+		DN:      e.DN,
+		Name:    e.GetAttributeValue("cn"),
+		GID:     gid,
+		Members: e.GetAttributeValues("memberUid"),
+	}, nil
 }
