@@ -228,3 +228,150 @@ func (c *Client) RemoveGroup(name string) error {
 
 	return nil
 }
+
+func (c *Client) QueryUser(uid string) (*types.UserDetails, error) {
+	req := ldap.NewSearchRequest(
+		c.cfg.PeopleOU,
+		ldap.ScopeWholeSubtree, ldap.NeverDerefAliases, 0, 0, false,
+		fmt.Sprintf("(uid=%s)", ldap.EscapeFilter(uid)),
+		[]string{"dn", "uid", "givenName", "sn", "mail", "uidNumber", "gidNumber", "homeDirectory", "loginShell"},
+		nil,
+	)
+
+	result, err := c.conn.Search(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to search for user '%s': %w", uid, err)
+	}
+	if len(result.Entries) == 0 {
+		return nil, fmt.Errorf("user '%s' not found", uid)
+	}
+
+	e := result.Entries[0]
+	uidNum, _ := strconv.Atoi(e.GetAttributeValue("uidNumber"))
+	gidNum, _ := strconv.Atoi(e.GetAttributeValue("gidNumber"))
+
+	// Find group memberships
+	groupReq := ldap.NewSearchRequest(
+		c.cfg.GroupOU,
+		ldap.ScopeWholeSubtree, ldap.NeverDerefAliases, 0, 0, false,
+		fmt.Sprintf("(memberUid=%s)", ldap.EscapeFilter(uid)),
+		[]string{"cn"},
+		nil,
+	)
+	groupResult, err := c.conn.Search(groupReq)
+	if err != nil {
+		return nil, fmt.Errorf("failed to search groups for user '%s': %w", uid, err)
+	}
+	var groups []string
+	for _, g := range groupResult.Entries {
+		groups = append(groups, g.GetAttributeValue("cn"))
+	}
+
+	return &types.UserDetails{
+		DN:        e.DN,
+		UID:       e.GetAttributeValue("uid"),
+		FirstName: e.GetAttributeValue("givenName"),
+		LastName:  e.GetAttributeValue("sn"),
+		Email:     e.GetAttributeValue("mail"),
+		UIDNumber: uidNum,
+		GIDNumber: gidNum,
+		HomeDir:   e.GetAttributeValue("homeDirectory"),
+		Shell:     e.GetAttributeValue("loginShell"),
+		Groups:    groups,
+	}, nil
+}
+
+func (c *Client) DeleteUser(uid string) error {
+	dn, err := c.findUserDN(uid)
+	if err != nil {
+		return err
+	}
+
+	if err := c.conn.Del(ldap.NewDelRequest(dn, nil)); err != nil {
+		return fmt.Errorf("failed to delete user '%s': %w", uid, err)
+	}
+
+	return nil
+}
+
+func (c *Client) ListUsers() ([]*types.UserDetails, error) {
+	req := ldap.NewSearchRequest(
+		c.cfg.PeopleOU,
+		ldap.ScopeWholeSubtree, ldap.NeverDerefAliases, 0, 0, false,
+		"(objectClass=posixAccount)",
+		[]string{"uid", "givenName", "sn", "mail", "uidNumber"},
+		nil,
+	)
+	result, err := c.conn.Search(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list users: %w", err)
+	}
+
+	var users []*types.UserDetails
+	for _, e := range result.Entries {
+		uidNum, _ := strconv.Atoi(e.GetAttributeValue("uidNumber"))
+		users = append(users, &types.UserDetails{
+			UID:       e.GetAttributeValue("uid"),
+			FirstName: e.GetAttributeValue("givenName"),
+			LastName:  e.GetAttributeValue("sn"),
+			Email:     e.GetAttributeValue("mail"),
+			UIDNumber: uidNum,
+		})
+	}
+	return users, nil
+}
+
+func (c *Client) ListGroups() ([]*types.GroupDetails, error) {
+	req := ldap.NewSearchRequest(
+		c.cfg.GroupOU,
+		ldap.ScopeWholeSubtree, ldap.NeverDerefAliases, 0, 0, false,
+		"(objectClass=posixGroup)",
+		[]string{"cn", "gidNumber", "memberUid"},
+		nil,
+	)
+	result, err := c.conn.Search(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list groups: %w", err)
+	}
+
+	var groups []*types.GroupDetails
+	for _, e := range result.Entries {
+		gid, _ := strconv.Atoi(e.GetAttributeValue("gidNumber"))
+		groups = append(groups, &types.GroupDetails{
+			Name:    e.GetAttributeValue("cn"),
+			GID:     gid,
+			Members: e.GetAttributeValues("memberUid"),
+		})
+	}
+	return groups, nil
+}
+
+func (c *Client) QueryGroup(name string) (*types.GroupDetails, error) {
+	groupDN := fmt.Sprintf("cn=%s,%s", name, c.cfg.GroupOU)
+
+	req := ldap.NewSearchRequest(
+		groupDN,
+		ldap.ScopeBaseObject, ldap.NeverDerefAliases, 0, 0, false,
+		"(objectClass=posixGroup)",
+		[]string{"cn", "gidNumber", "memberUid"},
+		nil,
+	)
+
+	result, err := c.conn.Search(req)
+	if err != nil {
+		return nil, fmt.Errorf("group '%s' not found: %w", name, err)
+	}
+	if len(result.Entries) == 0 {
+		return nil, fmt.Errorf("group '%s' not found", name)
+	}
+
+	e := result.Entries[0]
+	gid, _ := strconv.Atoi(e.GetAttributeValue("gidNumber"))
+
+	return &types.GroupDetails{
+		DN:      e.DN,
+		Name:    e.GetAttributeValue("cn"),
+		GID:     gid,
+		Members: e.GetAttributeValues("memberUid"),
+	}, nil
+}
