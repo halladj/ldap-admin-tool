@@ -1,6 +1,8 @@
 package pdf
 
 import (
+	"bytes"
+	_ "embed"
 	"fmt"
 	"os"
 
@@ -9,16 +11,29 @@ import (
 	"github.com/halladj/ldap-admin-tool/internal/types"
 )
 
+//go:embed assets/logo.png
+var logoPNG []byte
+
 func Generate(cfg *config.Config, user types.User) ([]byte, error) {
 	pdf := gofpdf.New("P", "mm", "A4", "")
+
+	// Register embedded logo
+	pdf.RegisterImageOptionsReader("logo", gofpdf.ImageOptions{ImageType: "PNG"}, bytes.NewReader(logoPNG))
+
 	pdf.AddPage()
 
-	// Header
-	pdf.SetFont("Helvetica", "B", 20)
-	pdf.CellFormat(0, 15, "your-domain.org", "", 1, "C", false, 0, "")
-	pdf.SetFont("Helvetica", "", 14)
-	pdf.CellFormat(0, 10, "LDAP Account Credentials", "", 1, "C", false, 0, "")
-	pdf.Ln(10)
+	// Logo centered at top
+	imgW := 50.0
+	pageW, _ := pdf.GetPageSize()
+	pdf.ImageOptions("logo", (pageW-imgW)/2, 10, imgW, 0, false, gofpdf.ImageOptions{ImageType: "PNG"}, 0, "")
+	pdf.Ln(32)
+
+	// Lab name
+	pdf.SetFont("Helvetica", "B", 18)
+	pdf.CellFormat(0, 10, "MISC Laboratory", "", 1, "C", false, 0, "")
+	pdf.SetFont("Helvetica", "", 13)
+	pdf.CellFormat(0, 8, "LDAP Account Credentials", "", 1, "C", false, 0, "")
+	pdf.Ln(8)
 
 	// Account Details header
 	pdf.SetFont("Helvetica", "B", 12)
@@ -71,13 +86,12 @@ func Generate(cfg *config.Config, user types.User) ([]byte, error) {
 	}
 	tmpPath := tmpFile.Name()
 	tmpFile.Close()
-	defer os.Remove(tmpPath) // always cleanup temp file
+	defer os.Remove(tmpPath)
 
 	if err := pdf.OutputFileAndClose(tmpPath); err != nil {
 		return nil, fmt.Errorf("failed to generate PDF: %w", err)
 	}
 
-	// Read PDF content into memory
 	data, err := os.ReadFile(tmpPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read generated PDF: %w", err)
