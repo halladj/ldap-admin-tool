@@ -50,7 +50,7 @@ func Generate(cfg *config.Config, user types.User) ([]byte, error) {
 		{"Username", user.UID},
 		{"Email", user.Email},
 		{"Password", user.Password},
-		{"LDAP Server", cfg.LDAPServer},
+		{"Services Portal", "services.misc-lab.org"},
 		{"Base DN", cfg.BaseDN},
 	}
 

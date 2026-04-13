@@ -23,6 +23,18 @@ type Config struct {
 	MinGIDNumber  int    `mapstructure:"min_gid_number"`
 }
 
+// Build-time injectable defaults (override with -ldflags "-X github.com/halladj/ldap-admin-tool/internal/config.DefaultLDAPServer=...")
+var (
+	DefaultLDAPServer   = "ldaps://ldap.your-domain.org"
+	DefaultBaseDN       = "dc=your-domain,dc=org"
+	DefaultPeopleOU     = "ou=People,dc=your-domain,dc=org"
+	DefaultGroupOU      = "ou=group,dc=your-domain,dc=org"
+	DefaultAdminDN      = "cn=admin,dc=your-domain,dc=org"
+	DefaultAdminPassFile = "/etc/ldap/admin_pass"
+	DefaultSenderEmail  = "noreply@your-domain.org"
+	DefaultShell        = "/bin/bash"
+)
+
 func Load() (*Config, error) {
 	viper.SetConfigName("config")
 	viper.SetConfigType("yaml")
@@ -32,15 +44,15 @@ func Load() (*Config, error) {
 	}
 	viper.AddConfigPath(".")
 
-	// Defaults
-	viper.SetDefault("ldap_server", "ldaps://ldap01.your-domain.org")
-	viper.SetDefault("base_dn", "dc=your-domain,dc=org")
-	viper.SetDefault("people_ou", "ou=People,dc=your-domain,dc=org")
-	viper.SetDefault("group_ou", "ou=group,dc=your-domain,dc=org")
-	viper.SetDefault("admin_dn", "cn=admin,dc=your-domain,dc=org")
-	viper.SetDefault("admin_pass_file", "/etc/ldap/admin_pass")
-	viper.SetDefault("sender_email", "noreply@your-domain.org")
-	viper.SetDefault("default_shell", "/bin/bash")
+	// Defaults (overridable at build time via -ldflags)
+	viper.SetDefault("ldap_server", DefaultLDAPServer)
+	viper.SetDefault("base_dn", DefaultBaseDN)
+	viper.SetDefault("people_ou", DefaultPeopleOU)
+	viper.SetDefault("group_ou", DefaultGroupOU)
+	viper.SetDefault("admin_dn", DefaultAdminDN)
+	viper.SetDefault("admin_pass_file", DefaultAdminPassFile)
+	viper.SetDefault("sender_email", DefaultSenderEmail)
+	viper.SetDefault("default_shell", DefaultShell)
 	viper.SetDefault("default_gid", 10008)
 	viper.SetDefault("min_uid_number", 10000)
 	viper.SetDefault("min_gid_number", 10000)
