@@ -21,6 +21,7 @@ type Config struct {
 	DefaultGID    int    `mapstructure:"default_gid"`
 	MinUIDNumber  int    `mapstructure:"min_uid_number"`
 	MinGIDNumber  int    `mapstructure:"min_gid_number"`
+	APIKey        string `mapstructure:"api_key"`
 }
 
 // Build-time injectable defaults (override with -ldflags "-X github.com/halladj/ldap-admin-tool/internal/config.DefaultLDAPServer=...")

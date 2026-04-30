@@ -13,22 +13,22 @@ type User struct {
 
 // UserDetails holds the attributes returned by a user query.
 type UserDetails struct {
-	DN        string
-	UID       string
-	FirstName string
-	LastName  string
-	Email     string
-	UIDNumber int
-	GIDNumber int
-	HomeDir   string
-	Shell     string
-	Groups    []string
+	DN        string   `json:"dn,omitempty"`
+	UID       string   `json:"uid"`
+	FirstName string   `json:"first_name"`
+	LastName  string   `json:"last_name"`
+	Email     string   `json:"email"`
+	UIDNumber int      `json:"uid_number"`
+	GIDNumber int      `json:"gid_number"`
+	HomeDir   string   `json:"home_dir"`
+	Shell     string   `json:"shell"`
+	Groups    []string `json:"groups,omitempty"`
 }
 
 // GroupDetails holds the attributes returned by a group query.
 type GroupDetails struct {
-	DN      string
-	Name    string
-	GID     int
-	Members []string
+	DN      string   `json:"dn,omitempty"`
+	Name    string   `json:"name"`
+	GID     int      `json:"gid"`
+	Members []string `json:"members,omitempty"`
 }

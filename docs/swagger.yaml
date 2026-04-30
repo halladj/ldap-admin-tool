@@ -1,0 +1,564 @@
+basePath: /api/v1
+definitions:
+  api.ChangeEmailRequest:
+    properties:
+      email:
+        example: newemail@example.com
+        type: string
+    required:
+    - email
+    type: object
+  api.ChangePasswordRequest:
+    properties:
+      password:
+        example: NewP@ss123!
+        type: string
+    type: object
+  api.ChangePasswordResponse:
+    properties:
+      password:
+        type: string
+    type: object
+  api.CreateGroupRequest:
+    properties:
+      gid:
+        example: 10050
+        type: integer
+      name:
+        example: printing-c
+        type: string
+    required:
+    - name
+    type: object
+  api.CreateUserRequest:
+    properties:
+      email:
+        example: jdoe@example.com
+        type: string
+      first_name:
+        example: John
+        type: string
+      gid:
+        example: 10008
+        type: integer
+      groups:
+        items:
+          type: string
+        type: array
+      last_name:
+        example: Doe
+        type: string
+      password:
+        example: MyP@ss123!
+        type: string
+      send_email:
+        example: true
+        type: boolean
+      send_pdf:
+        example: true
+        type: boolean
+      uid:
+        example: jdoe
+        type: string
+    required:
+    - email
+    - first_name
+    - last_name
+    type: object
+  api.CreateUserResponse:
+    properties:
+      email_sent:
+        type: boolean
+      groups:
+        items:
+          type: string
+        type: array
+      uid:
+        type: string
+      uid_number:
+        type: integer
+    type: object
+  api.ErrorResponse:
+    properties:
+      error:
+        example: user 'jdoe' not found
+        type: string
+    type: object
+  api.GroupMembersRequest:
+    properties:
+      uids:
+        items:
+          type: string
+        type: array
+    required:
+    - uids
+    type: object
+  api.UserGroupsRequest:
+    properties:
+      groups:
+        items:
+          type: string
+        type: array
+    required:
+    - groups
+    type: object
+  types.GroupDetails:
+    properties:
+      dn:
+        type: string
+      gid:
+        type: integer
+      members:
+        items:
+          type: string
+        type: array
+      name:
+        type: string
+    type: object
+  types.UserDetails:
+    properties:
+      dn:
+        type: string
+      email:
+        type: string
+      first_name:
+        type: string
+      gid_number:
+        type: integer
+      groups:
+        items:
+          type: string
+        type: array
+      home_dir:
+        type: string
+      last_name:
+        type: string
+      shell:
+        type: string
+      uid:
+        type: string
+      uid_number:
+        type: integer
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: REST API for LDAP user and group management.
+  title: ldap-admin-tool API
+  version: "1.0"
+paths:
+  /groups:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/types.GroupDetails'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: List all groups
+      tags:
+      - groups
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Group creation request
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/api.CreateGroupRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/types.GroupDetails'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Create a new group
+      tags:
+      - groups
+  /groups/{name}:
+    delete:
+      parameters:
+      - description: Group name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Delete a group
+      tags:
+      - groups
+    get:
+      parameters:
+      - description: Group name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.GroupDetails'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Get a group by name
+      tags:
+      - groups
+  /groups/{name}/members:
+    delete:
+      consumes:
+      - application/json
+      parameters:
+      - description: Group name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: UIDs to remove
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/api.GroupMembersRequest'
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Remove members from a group
+      tags:
+      - groups
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Group name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: UIDs to add
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/api.GroupMembersRequest'
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Add members to a group
+      tags:
+      - groups
+  /users:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/types.UserDetails'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: List all users
+      tags:
+      - users
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: User creation request
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/api.CreateUserRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/api.CreateUserResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Create a new user
+      tags:
+      - users
+  /users/{uid}:
+    delete:
+      parameters:
+      - description: Username
+        in: path
+        name: uid
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Delete a user
+      tags:
+      - users
+    get:
+      parameters:
+      - description: Username
+        in: path
+        name: uid
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.UserDetails'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Get a user by UID
+      tags:
+      - users
+  /users/{uid}/email:
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Username
+        in: path
+        name: uid
+        required: true
+        type: string
+      - description: New email address
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/api.ChangeEmailRequest'
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Change a user's email
+      tags:
+      - users
+  /users/{uid}/groups:
+    delete:
+      consumes:
+      - application/json
+      parameters:
+      - description: Username
+        in: path
+        name: uid
+        required: true
+        type: string
+      - description: Groups to remove from
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/api.UserGroupsRequest'
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Remove a user from groups
+      tags:
+      - users
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Username
+        in: path
+        name: uid
+        required: true
+        type: string
+      - description: Groups to add
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/api.UserGroupsRequest'
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Add a user to groups
+      tags:
+      - users
+  /users/{uid}/password:
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Username
+        in: path
+        name: uid
+        required: true
+        type: string
+      - description: Leave password empty to auto-generate
+        in: body
+        name: body
+        schema:
+          $ref: '#/definitions/api.ChangePasswordRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.ChangePasswordResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Change a user's password
+      tags:
+      - users
+securityDefinitions:
+  ApiKeyAuth:
+    in: header
+    name: X-Api-Key
+    type: apiKey
+swagger: "2.0"
