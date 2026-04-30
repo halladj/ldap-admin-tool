@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"fmt"
+
 	"github.com/halladj/ldap-admin-tool/api"
 	"github.com/halladj/ldap-admin-tool/internal/config"
 	ldapclient "github.com/halladj/ldap-admin-tool/internal/ldap"
@@ -29,6 +31,10 @@ func runServe(_ *cobra.Command, _ []string) error {
 	adminPass, err := cfg.LoadAdminPassword()
 	if err != nil {
 		return err
+	}
+
+	if cfg.APIKey == "" {
+		return fmt.Errorf("api_key is not set — run 'ldap-admin-tool generate-apikey' and add it to config.yaml or set LDAP_ADMIN_TOOL_API_KEY")
 	}
 
 	// Validate LDAP connectivity before starting the server
